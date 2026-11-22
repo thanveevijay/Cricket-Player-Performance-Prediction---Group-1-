@@ -52,13 +52,23 @@ def main() -> None:
     if X_train.isna().any().any() or X_test.isna().any().any():
         raise ValueError("Feature data contains missing values; clean or impute them before training.")
 
+    # Fit the same preprocessing pipeline used by the Streamlit app on training
+    # rows only, then reuse it for the held-out test rows and future predictions.
+    pipeline_path = MODEL_DIR / "featurepipeline.pkl"
+    if not pipeline_path.is_file():
+        raise FileNotFoundError(f"Expected preprocessing pipeline at {pipeline_path}.")
+    pipeline = joblib.load(pipeline_path)
+    X_train_processed = pipeline.fit_transform(X_train)
+    X_test_processed = pipeline.transform(X_test)
+    joblib.dump(pipeline, pipeline_path)
+
     model = RandomForestRegressor(
         n_estimators=200,
         random_state=42,
         n_jobs=-1,
     )
-    model.fit(X_train, y_train)
-    predictions = model.predict(X_test)
+    model.fit(X_train_processed, y_train)
+    predictions = model.predict(X_test_processed)
 
     mse = mean_squared_error(y_test, predictions)
     rmse = mse ** 0.5
