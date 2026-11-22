@@ -1,0 +1,29 @@
+name: Python syntax checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Cricket Player Performance Prediction/Cricket-Player-Performance-Prediction---Group-1--main/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "Cricket Player Performance Prediction/Cricket-Player-Performance-Prediction---Group-1--main/**"
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile project scripts
+        run: |
+          python -m py_compile \
+            "Cricket Player Performance Prediction/Cricket-Player-Performance-Prediction---Group-1--main/split_data.py" \
+            "Cricket Player Performance Prediction/Cricket-Player-Performance-Prediction---Group-1--main/train_data.py" \
+            "Cricket Player Performance Prediction/Cricket-Player-Performance-Prediction---Group-1--main/streamlit_app.py"
