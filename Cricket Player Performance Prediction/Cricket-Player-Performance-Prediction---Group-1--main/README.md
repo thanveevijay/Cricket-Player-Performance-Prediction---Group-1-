@@ -1,54 +1,48 @@
 # Cricket Player Performance Prediction
 
-This project explores batsman performance analysis and next-match run prediction using IPL ball-by-ball data, feature engineering, a Random Forest regressor, and a Streamlit interface.
+This project explores batsman performance analysis and next-match run prediction using IPL ball-by-ball data, feature engineering, and regression models.
 
-## Project files
+## Project structure
 
-- `src/data_cleaning.py` — cleans delivery-level data and creates derived fields.
-- `split_data.py` — creates train and test CSV files from the engineered batsman dataset.
-- `train_data.py` — fits the preprocessing pipeline and Random Forest model, then evaluates on the held-out test split.
-- `streamlit_app.py` — interactive next-match run prediction interface.
-- `models/featurepipeline.pkl` — preprocessing pipeline used by training and inference.
-- `data/` — source and derived datasets (large files may be stored using Git LFS).
+The repository contains the project under `Cricket Player Performance Prediction/Cricket-Player-Performance-Prediction---Group-1--main/`. Within that project directory, the main workflow includes:
+
+- `milestone 3/scripts/` — baseline, training, feature-analysis, and evaluation scripts.
+- `data/` — source and processed datasets.
+- `models/` — serialized preprocessing/model artifacts.
+- `notebooks/` — exploratory analysis and experiments.
+- `.github/workflows/python-checks.yml` — automated Python checks.
+
+Some datasets and generated artifacts may be tracked using Git LFS. Make sure LFS objects are available before running data-dependent scripts.
 
 ## Environment setup
 
-Run commands from this project directory:
+Run commands from the project directory:
 
 ```bash
 python -m venv .venv
-# Windows
-.venv\\Scripts\\activate
-# macOS/Linux
-source .venv/bin/activate
-
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-## Rebuild the model
+Use the requirements file in the project directory. Some experimental scripts may require additional optional libraries; install those only for the corresponding experiment.
 
-Ensure the Git LFS data files are available locally, then run:
+## Running experiments
 
-```bash
-python split_data.py
-python train_data.py
-```
-
-The split script currently uses `matches_played <= 50` for training and `matches_played > 50` for testing. This is a simple career-stage split; it is not a substitute for a carefully designed player- and time-aware validation strategy. Review the player and match identifiers before using the results in a report.
-
-Training fits the saved preprocessing pipeline on the training rows only, transforms the test rows with that fitted pipeline, and writes `models/batsman_runs_model.pkl`.
-
-## Run the Streamlit app
+The milestone 3 scripts are standalone experiments and expect their input files under `data/processed/`. For example, the rolling-average baseline can be run from the project directory with:
 
 ```bash
-streamlit run streamlit_app.py
+python "milestone 3/scripts/baseline.py"
 ```
 
-The app expects both the preprocessing pipeline and trained model in `models/`. Its displayed regression metrics are computed from `data/test.csv`.
+The baseline sorts each batsman's records by date and uses the previous ten matches (with at least three prior observations) to calculate a prediction. It then evaluates the later portion of the data and writes `baseline_predictions.csv` to the processed-data directory.
 
-## Important evaluation notes
+## Evaluation guidance
 
-- Do not train and evaluate on the same rows.
-- Keep the preprocessing fit restricted to training data to avoid leakage.
-- Report MAE, RMSE, MSE, and R² alongside the exact split strategy and dataset version.
-- Predictions are exploratory estimates, not guarantees of an individual player's future performance.
+- Compare learned models against a simple baseline before claiming an improvement.
+- Preserve chronological ordering when evaluating future-match predictions.
+- Check player and match identifiers to avoid leakage between training and test sets.
+- Fit preprocessing steps on training data only, then apply the fitted transformations to validation/test data.
+- Report the dataset version, split strategy, MAE, RMSE, and R² together.
+- Treat predictions as exploratory estimates, not guarantees of future player performance.
