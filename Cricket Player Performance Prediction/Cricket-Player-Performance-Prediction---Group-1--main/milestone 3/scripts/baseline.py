@@ -1,44 +1,74 @@
-# scripts/baseline.py
-# Baseline: 10-match rolling average for batsman runs
+"""Evaluate a leakage-aware 10-match rolling-average run baseline."""
 
 from pathlib import Path
-import pandas as pd
+
 import numpy as np
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+import pandas as pd
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 ROOT = Path(__file__).resolve().parents[1]
 PROC = ROOT / "data" / "processed"
+INPUT_FILE = PROC / "batsman_match_model_ready.csv"
+OUTPUT_FILE = PROC / "baseline_predictions.csv"
+REQUIRED_COLUMNS = {"match_id", "batsman", "date_parsed", "runs"}
 
-def main():
-    df = pd.read_csv(PROC / "batsman_match_model_ready.csv")
-    df['date_parsed'] = pd.to_datetime(df['date_parsed'])
 
-    df = df.sort_values(['batsman','date_parsed']).reset_index(drop=True)
+def build_rolling_baseline(frame: pd.DataFrame) -> pd.DataFrame:
+    """Add a prediction based only on each batsman's previous ten matches."""
+    missing = REQUIRED_COLUMNS.difference(frame.columns)
+    if missing:
+        raise ValueError(f"Input data is missing required columns: {sorted(missing)}")
 
-    df['baseline_rolling_10'] = (
-        df.groupby('batsman')['runs']
-          .transform(lambda s: s.shift(1).rolling(10, min_periods=3).mean())
+    result = frame.copy()
+    result["date_parsed"] = pd.to_datetime(result["date_parsed"], errors="coerce")
+    result["runs"] = pd.to_numeric(result["runs"], errors="coerce")
+    result = result.dropna(subset=["batsman", "date_parsed", "runs"])
+    result = result.sort_values(["batsman", "date_parsed", "match_id"]).reset_index(drop=True)
+
+    result["baseline_rolling_10"] = (
+        result.groupby("batsman")["runs"]
+        .transform(lambda values: values.shift(1).rolling(10, min_periods=3).mean())
     )
+    return result
 
-    baseline_df = df.dropna(subset=['baseline_rolling_10'])
 
-    split_date = baseline_df['date_parsed'].quantile(0.80)
-    test = baseline_df[baseline_df['date_parsed'] > split_date]
+def main() -> None:
+    if not INPUT_FILE.exists():
+        raise FileNotFoundError(
+            f"Expected processed input at {INPUT_FILE}. "
+            "Run the preprocessing workflow before evaluating the baseline."
+        )
 
-    y_true = test['runs']
-    y_pred = test['baseline_rolling_10']
+    df = build_rolling_baseline(pd.read_csv(INPUT_FILE))
+    baseline_df = df.dropna(subset=["baseline_rolling_10"])
 
-    rmse = mean_squared_error(y_true, y_pred, squared=False)
-    mae  = mean_absolute_error(y_true, y_pred)
-    r2   = r2_score(y_true, y_pred)
+    if baseline_df.empty:
+        raise ValueError("Not enough historical matches to calculate the rolling baseline.")
 
-    print("BASELINE (10-match rolling avg)")
+    split_date = baseline_df["date_parsed"].quantile(0.80)
+    test = baseline_df.loc[baseline_df["date_parsed"] > split_date].copy()
+    if test.empty:
+        raise ValueError("The chronological test split is empty; check the input dates.")
+
+    y_true = test["runs"]
+    y_pred = test["baseline_rolling_10"]
+
+    rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
+    mae = mean_absolute_error(y_true, y_pred)
+    r2 = r2_score(y_true, y_pred) if len(test) > 1 else float("nan")
+
+    print("BASELINE (10-match rolling average)")
+    print(f"Test rows: {len(test)}")
+    print(f"Split date: {split_date.date()}")
     print(f"RMSE: {rmse:.3f}")
     print(f"MAE : {mae:.3f}")
     print(f"R²  : {r2:.3f}")
 
-    out = PROC / "baseline_predictions.csv"
-    test[['match_id','batsman','date_parsed','runs','baseline_rolling_10']].to_csv(out, index=False)
+    PROC.mkdir(parents=True, exist_ok=True)
+    columns = ["match_id", "batsman", "date_parsed", "runs", "baseline_rolling_10"]
+    test[columns].to_csv(OUTPUT_FILE, index=False)
+    print(f"Saved predictions to {OUTPUT_FILE}")
+
 
 if __name__ == "__main__":
     main()
