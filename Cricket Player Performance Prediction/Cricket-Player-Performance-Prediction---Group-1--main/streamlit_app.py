@@ -124,12 +124,15 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 @st.cache_data
 def load_evaluation_metrics():
-    df = pd.read_csv("data/final_batsman_features.csv")
+    df = pd.read_csv("data/test.csv")
+    if "runs_next_match" not in df.columns:
+        raise ValueError("The held-out test file must contain runs_next_match.")
 
     X = df.drop("runs_next_match", axis=1)
     y = df["runs_next_match"]
+    X_processed = pipeline.transform(X)
 
-    y_pred = model.predict(X)
+    y_pred = model.predict(X_processed)
 
     mse = mean_squared_error(y, y_pred)
     rmse = mse ** 0.5
@@ -148,4 +151,4 @@ col1.metric("MSE", f"{mse:.3f}")
 col2.metric("RMSE", f"{rmse:.3f}")
 col3.metric("R² Score", f"{r2:.3f}")
 
-st.caption("Metrics calculated on the dataset used during model training.")
+st.caption("Metrics are calculated on the held-out test split, not the training rows.")
